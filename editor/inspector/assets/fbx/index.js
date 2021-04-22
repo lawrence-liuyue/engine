@@ -1,5 +1,4 @@
 'use strict';
-
 const path = require('path');
 
 exports.template = `
@@ -43,11 +42,11 @@ const Components = {
 };
 
 /**
- * 属性对应的编辑元素
+ * attribute corresponds to the edit element
  */
 const Elements = {
     tabs: {
-        ready() {
+        ready () {
             const panel = this;
 
             panel.$.tabs.addEventListener('change', () => {
@@ -57,7 +56,7 @@ const Elements = {
 
             panel.activeTab = 'animation';
         },
-        update() {
+        update () {
             const panel = this;
 
             panel.$.tabs.innerText = '';
@@ -83,16 +82,16 @@ const Elements = {
         },
     },
     tabPanel: {
-        ready() {
+        ready () {
             const panel = this;
 
             panel.$.tabPanel.addEventListener('change', () => {
                 panel.dispatch('change');
             });
         },
-        update() {
+        update () {
             const panel = this;
-
+            Editor.Message.broadcast('fbx-inspector:change-tab', panel.activeTab);
             panel.$.tabPanel.setAttribute('src', Components[panel.activeTab]);
             panel.$.tabPanel.update(panel.assetList, panel.metaList);
         },
@@ -100,7 +99,7 @@ const Elements = {
 };
 
 /**
- * 自动渲染组件的方法
+ * Methods for automatic rendering of components
  * @param assetList
  * @param metaList
  */
@@ -119,7 +118,7 @@ exports.update = function (assetList, metaList) {
 };
 
 /**
- * 初始化界面的方法
+ * Method of initializing the panel
  */
 exports.ready = function () {
     for (const prop in Elements) {
@@ -132,18 +131,16 @@ exports.ready = function () {
 
 exports.methods = {
     /**
-     * 更新多选状态下某个数据是否可编辑
+     * Update whether a data is editable in multi-select state
      */
-    updateInvalid(element, prop) {
-        const invalid = this.metaList.some((meta) => {
-            return meta.userData[prop] !== this.meta.userData[prop];
-        });
+    updateInvalid (element, prop) {
+        const invalid = this.metaList.some((meta) => meta.userData[prop] !== this.meta.userData[prop]);
         element.invalid = invalid;
     },
     /**
-     * 更新只读状态
+     * Update read-only status
      */
-    updateReadonly(element) {
+    updateReadonly (element) {
         if (this.asset.readonly) {
             element.setAttribute('disabled', true);
         } else {

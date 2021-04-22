@@ -1,6 +1,6 @@
 'use strict';
 
-const { readJSONSync, existsSync } = require('fs-extra');
+const { readFileSync, existsSync } = require('fs');
 
 exports.template = `
 <div class="asset-effect">
@@ -88,7 +88,7 @@ exports.$ = {
 };
 
 /**
- * 属性对应的编辑元素
+ * Property corresponds to the edit element
  */
 const Elements = {
     shaders: {
@@ -98,7 +98,7 @@ const Elements = {
             panel.$.shaderSelect.addEventListener('change', (event) => {
                 this.shadersIndex = event.target.value;
 
-                // 有其他属性的更新依赖它的变动
+                // There are other properties that are updated depending on its change
                 Elements.combinations.update.call(panel);
                 Elements.codes.update.call(panel);
             });
@@ -164,7 +164,7 @@ const Elements = {
                         const userCombinations = panel.combinations[panel.shadersIndex][define.name];
 
                         if (userCombinations.indexOf(value) !== -1) {
-                            // 剔除已存在，能多选
+                            // Eliminate existing, can choose more
                             userCombinations.splice(userCombinations.indexOf(value), 1);
                             button.setAttribute('checked', 'false');
                         } else {
@@ -172,6 +172,7 @@ const Elements = {
                             button.setAttribute('checked', 'true');
                         }
 
+                        panel.dataChange();
                         panel.dispatch('change');
                     });
                 });
@@ -194,6 +195,7 @@ const Elements = {
                 const section = document.createElement('ui-section');
                 panel.$.codes.appendChild(section);
                 section.setAttribute('class', 'config');
+                section.setAttribute('expand', '');
 
                 const glslName = panel.glslNames[glslKey];
 
@@ -244,7 +246,7 @@ const Elements = {
 };
 
 /**
- * 初始化界面的方法
+ * A method to initialize the panel
  */
 exports.ready = function () {
     for (const prop in Elements) {
@@ -256,7 +258,7 @@ exports.ready = function () {
 };
 
 /**
- * 自动渲染组件的方法
+ * Methods to automatically render components
  * @param assetList
  * @param metaList
  */
@@ -290,7 +292,7 @@ exports.methods = {
     refresh() {
         const panel = this;
 
-        // 重要：展示的数据既用到了 library ,又用到了 meta，需要保持两者一致
+        // notice : The data displayed uses both the library and the meta, so you need to keep both consistent
         if (panel.asset.uuid !== panel.meta.uuid) {
             return false;
         }
@@ -302,7 +304,7 @@ exports.methods = {
             return false;
         }
 
-        const dataSource = readJSONSync(fileSource);
+        const dataSource = JSON.parse(readFileSync(fileSource, 'utf8'));
 
         if (!dataSource) {
             console.error('Read effect json file in library failed.');
@@ -321,13 +323,13 @@ exports.methods = {
             frag: 'Fragment Shader',
         };
 
-        // 每个 shader 里 defines 已编辑的值
+        // The edited value of defines in each shader
         panel.combinations = [];
         if (Array.isArray(panel.meta.userData.combinations)) {
             panel.combinations = panel.meta.userData.combinations;
         }
 
-        // 调整部分数据以用于展示
+        // Adjusting some data for display
         panel.shaders.forEach((shader, index) => {
             for (const glslKey in panel.glslNames) {
                 shader[glslKey].activeKey = 'vert';
@@ -337,18 +339,18 @@ exports.methods = {
                 panel.combinations[index] = {};
             }
 
-            // 可配置的定义，有注入临时数据
+            // Configurable definition with injection of temporary data
             shader.defines.forEach((define) => {
                 const { name, type } = define;
                 if (name.startsWith('CC_')) {
-                    // CC_ 开头的不处理
+                    // Prefixed with "CC_" are not processed
                     define._enabled = false;
                     return;
                 } else {
                     define._enabled = true;
                 }
 
-                // 以下数据为显示编辑使用
+                // The following data is used for display editing
                 define._values = [];
 
                 if (type === 'number' && define.range) {
@@ -371,7 +373,7 @@ exports.methods = {
         return true;
     },
     /**
-     * 更新只读状态
+     * Update read-only status
      */
     updateReadonly(element) {
         if (this.asset.readonly) {
@@ -380,10 +382,10 @@ exports.methods = {
             element.removeAttribute('disabled');
         }
     },
-    apply() {
+    dataChange() {
         const panel = this;
 
-        // 需要剔除空数组，不然 scene 会报错
+        // Need to exclude empty arrays, otherwise scene will report an error
         const submitData = [];
         panel.combinations.forEach((combination, index) => {
             submitData[index] = {};

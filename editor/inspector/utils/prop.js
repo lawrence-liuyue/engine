@@ -52,7 +52,7 @@ exports.getCustomPropElements = function (excludeList, dump, onElementCreated) {
 };
 
 /**
- * 工具函数：循环设置资源数据中的 readonly
+ * Tool function: recursively set readonly in resource data
  */
 exports.loopSetAssetDumpDataReadonly = function (dump) {
     if (typeof dump !== 'object') {
@@ -78,11 +78,15 @@ exports.loopSetAssetDumpDataReadonly = function (dump) {
 };
 
 /**
- * 工具函数：设置不可用
+ * Tool functions: set to unavailable
  * @param {object} data  dump | function
  * @param element
  */
 exports.setDisabled = function (data, element) {
+    if (!element) {
+        return;
+    }
+    
     let disabled = data;
 
     if (typeof data === 'function') {
@@ -97,11 +101,15 @@ exports.setDisabled = function (data, element) {
 };
 
 /**
- * 工具函数：设置只读状态
+ * Tool function: Set read-only status
  * @param {object} data  dump | function
  * @param element
  */
 exports.setReadonly = function (data, element) {
+    if (!element) {
+        return;
+    }
+
     let readonly = data;
 
     if (typeof data === 'function') {
@@ -114,18 +122,22 @@ exports.setReadonly = function (data, element) {
         element.removeAttribute('readonly');
     }
 
-    if (element.render) {
+    if (element.render && element.dump) {
         element.dump.readonly = readonly;
         element.render();
     }
 };
 
 /**
- * 工具函数：设置显示状态
+ * Tool function: Set the display status
  * @param {object} data  dump | function
  * @param element
  */
 exports.setHidden = function (data, element) {
+    if (!element) {
+        return;
+    }
+
     let hidden = data;
 
     if (typeof data === 'function') {
@@ -153,18 +165,23 @@ exports.updatePropByDump = function (panel, dump) {
         const element = panel.elements[key];
 
         if (!panel.$[key]) {
-            // 元素不存在且数据告知不需要显示，终止渲染
+            // element does not exist and the data tells that it does not need to be displayed, terminate rendering
             if (!dumpdata.visible) {
                 return;
             }
 
-            panel.$[key] = document.createElement('ui-prop');
-            panel.$[key].setAttribute('type', 'dump');
-            panel.$[key].render(dumpdata);
+            if (element && element.create) {
+                // when it need to go custom initialize
+                panel.$[key] = element.create.call(panel, dumpdata);
+            } else {
+                panel.$[key] = document.createElement('ui-prop');
+                panel.$[key].setAttribute('type', 'dump');
+                panel.$[key].render(dumpdata);
+            }
 
             /**
-             * 上升引擎里定义，而自定义排序的范围在 0 - 100;
-             * 引擎里如果定义 displayOrder 为负数，小于 -100，则会优先于自定义的排序
+             * Defined in the ascending engine, while the custom order ranges from 0 - 100;
+             * If displayOrder is defined in the engine as a negative number, less than -100, it will take precedence over the custom ordering
              */
             panel.$[key].displayOrder = dumpdata.displayOrder === undefined ? 0 : Number(dumpdata.displayOrder);
             panel.$[key].displayOrder += 100;
@@ -173,44 +190,63 @@ exports.updatePropByDump = function (panel, dump) {
                 panel.$[key].displayOrder = element.displayOrder;
             }
         } else {
-            // 元素存在，但此时数据告知不需要显示，终止
+            // The element exists, but at this point the data informs that it does not need to be displayed and terminates
             if (!dumpdata.visible) {
                 return;
             }
 
-            panel.$[key].render(dumpdata);
+            if (panel.$[key].tagName === 'UI-PROP' && panel.$[key].getAttribute('type') === 'dump') {
+                panel.$[key].render(dumpdata);
+            }
         }
 
-        children.push(panel.$[key]);
+        if (panel.$[key]) {
+            children.push(panel.$[key]);
+        }
     });
 
-    // 重新排序
+    // Reorder
     children.sort((a, b) => a.displayOrder - b.displayOrder);
 
-    panel.$.componentContainer.replaceChildren(...children);
+    let $children = Array.from(panel.$.componentContainer.children);
+    children.forEach((child, i) => {
+        if (child === $children[i]) {
+            return;
+        }
 
-    children.forEach((child) => {
-        const key = child.dump.name;
-        const element = panel.elements[key];
-
-        if (element && element.ready) {
-            element.ready.call(panel, panel.$[key], dump.value);
-            element.ready = undefined; // ready 只需要执行一次
+        if ($children[i]) {
+            $children[i].replaceWith(child);
+        } else {
+            panel.$.componentContainer.appendChild(child);
         }
     });
 
-    children.forEach((child) => {
-        const key = child.dump.name;
-        const element = panel.elements[key];
+    // delete extra children
+    $children = Array.from(panel.$.componentContainer.children);
+    if ($children.length > children.length) {
+        for (let i = children.length; i < $children.length; i++) {
+            $children[i].remove();
+        }
+    }
 
+    for (const key in panel.elements) {
+        const element = panel.elements[key];
+        if (element && element.ready) {
+            element.ready.call(panel, panel.$[key], dump.value);
+            element.ready = undefined; // ready needs to be executed only once
+        }
+    }
+
+    for (const key in panel.elements) {
+        const element = panel.elements[key];
         if (element && element.update) {
             element.update.call(panel, panel.$[key], dump.value);
         }
-    });
+    }
 };
 
 /**
- * 工具函数：检查多选后属性值是否一致
+ * Tool function: check whether the value of the attribute is consistent after multi-selection
  */
 exports.isMultipleInvalid = function (dump) {
     let invalid = false;

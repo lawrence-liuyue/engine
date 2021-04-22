@@ -9,6 +9,15 @@ exports.template = `
     <div class="warn-words">
         <ui-label i18n value="ENGINE.assets.fbx.legacyFbxImporter.warn"></ui-label>
     </div>
+    <ui-prop>
+        <ui-label slot="label" value="i18n:ENGINE.assets.fbx.animationBakeRate.name" tooltip="i18n:ENGINE.assets.fbx.animationBakeRate.title"></ui-label>
+        <ui-select slot="content" class="animationBakeRate-select">
+            <option value="24">24</option>
+            <option value="25">25</option>
+            <option value="30">30</option>
+            <option value="60">60</option>
+        </ui-select>
+    </ui-prop>
 </div>
 `;
 
@@ -28,10 +37,11 @@ ui-section {
 exports.$ = {
     container: '.container',
     legacyFbxImporterCheckbox: '.legacyFbxImporter-checkbox',
+    animationBakeRateSelect: '.animationBakeRate-select',
 };
 
 /**
- * 属性对应的编辑元素
+ * attribute corresponds to the edit element
  */
 const Elements = {
     legacyFbxImporter: {
@@ -47,6 +57,21 @@ const Elements = {
 
             panel.updateInvalid(panel.$.legacyFbxImporterCheckbox, 'legacyFbxImporter');
             panel.updateReadonly(panel.$.legacyFbxImporterCheckbox);
+        },
+    },
+    animationBakeRate: {
+        ready() {
+            const panel = this;
+
+            panel.$.animationBakeRateSelect.addEventListener('change', panel.setProp.bind(panel, 'animationBakeRate'));
+        },
+        update() {
+            const panel = this;
+
+            panel.$.animationBakeRateSelect.value = panel.getDefault(panel.meta.userData.animationBakeRate, 60);
+
+            panel.updateInvalid(panel.$.animationBakeRateSelect, 'animationBakeRate');
+            panel.updateReadonly(panel.$.animationBakeRateSelect);
         },
     },
 };
@@ -92,7 +117,7 @@ exports.methods = {
         this.dispatch('change');
     },
     /**
-     * 更新多选状态下某个数据是否可编辑
+     * Update whether a data is editable in multi-select state
      */
      updateInvalid(element, prop) {
         const invalid = this.metaList.some((meta) => {
@@ -101,7 +126,7 @@ exports.methods = {
         element.invalid = invalid;
     },
     /**
-     * 更新只读状态
+     * Update read-only status
      */
     updateReadonly(element) {
         if (this.asset.readonly) {

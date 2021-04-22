@@ -1,7 +1,11 @@
-'use strict';
-
 exports.template = `
 <div class="container">
+    <div class="show-type-wrap">
+        <ui-tab class="show-type" value="0">
+            <ui-button value="time">Time</ui-button>
+            <ui-button value="frame">Frame</ui-button>
+        </ui-tab>
+    </div>
     <div class="clips"></div>
     <div class="editor">
         <div class="anim-name">
@@ -67,6 +71,9 @@ exports.style = `
 ui-prop,
 ui-section {
     margin: 4px 0;
+}
+.container > .show-type-wrap {
+    text-align: center;
 }
 .container > .clips {
     padding: 5px;
@@ -286,12 +293,15 @@ exports.$ = {
     controlRight: '.control-right',
     controlVirtual: '.control-virtual',
     controlVirtualNumber: '.control-virtual-number',
+    showTypeWrap: '.show-type-wrap',
+    showType: '.show-type',
 };
 
 /**
- * 属性对应的编辑元素
+ * attribute corresponds to the edit element
  */
 const Elements = {
+    // infos put first
     infos: {
         ready() {
             const panel = this;
@@ -305,7 +315,7 @@ const Elements = {
 
             if (panel.meta && panel.meta.userData.animationImportSettings) {
                 panel.animationInfos = panel.meta.userData.animationImportSettings;
-                // 收集 clip 名字用于重命名与新建时判断是否重名
+                // Support multiple selection when the list display, limit the number of display clip name collection for renaming and new to determine whether the same name
                 panel.clipNames = new Set();
                 for (const animationInfo of panel.animationInfos) {
                     panel.clipNames.add(animationInfo.name);
@@ -316,6 +326,28 @@ const Elements = {
             } else {
                 panel.animationInfos = null;
             }
+        },
+    },
+    showType: {
+        ready() {
+            const panel = this;
+            panel.animationTimeShowType = panel.$.showType.value === 0 ? 'time' : 'frame';
+            panel.$.showType.addEventListener('change', (event) => {
+                panel.animationTimeShowType = event.target.value === 0 ? 'time' : 'frame';
+                Elements.clips.update.call(panel);
+            });
+        },
+        update() {
+            const panel = this;
+
+            if (!panel.animationInfos) {
+                panel.$.showTypeWrap.style.display = 'none';
+                return;
+            } else {
+                panel.$.showTypeWrap.style.display = 'block';
+            }
+
+            panel.animationTimeShowType = panel.$.showType.value === 0 ? 'time' : 'frame';
         },
     },
     clips: {
@@ -379,20 +411,10 @@ const Elements = {
                         line.setAttribute('active', true);
                     }
                     table.appendChild(line);
-
+                    line.setAttribute('rawCLipIndex', rawClipIndex);
+                    line.setAttribute('splitClipIndex', splitClipIndex);
                     line.addEventListener('click', () => {
-                        panel.rawClipIndex = rawClipIndex;
-                        panel.splitClipIndex = splitClipIndex;
-
-                        Elements.editor.update.call(panel);
-
-                        panel.$.clips.querySelectorAll('.line').forEach((child) => {
-                            if (child === line) {
-                                child.setAttribute('active', true);
-                            } else {
-                                child.removeAttribute('active');
-                            }
-                        });
+                        panel.onSelect(rawClipIndex, splitClipIndex);
                     });
 
                     const name = document.createElement('div');
@@ -401,15 +423,17 @@ const Elements = {
                     line.appendChild(name);
                     const time = document.createElement('div');
                     time.setAttribute('class', 'time');
-                    time.innerHTML = subAnim.from.toFixed(2);
+                    time.innerHTML =
+                        panel.animationTimeShowType === 'time' ? subAnim.from.toFixed(2) : Math.round(subAnim.from * panel.rawClipInfo.fps);
                     line.appendChild(time);
                     const timeEnd = document.createElement('div');
                     timeEnd.setAttribute('class', 'time end');
-                    timeEnd.innerHTML = subAnim.to.toFixed(2);
+                    timeEnd.innerHTML =
+                        panel.animationTimeShowType === 'time' ? subAnim.to.toFixed(2) : Math.round(subAnim.to * panel.rawClipInfo.fps);
                     line.appendChild(timeEnd);
                 });
 
-                // 按钮区
+                // Button area
                 const addClip = document.createElement('div');
                 addClip.setAttribute('class', 'add-clip');
                 clip.appendChild(addClip);
@@ -594,6 +618,35 @@ exports.update = function (assetList, metaList) {
             element.update.call(this);
         }
     }
+    // animation name -> uuid
+    if (this.meta && this.meta.subMetas) {
+        const animationNameToUUIDMap = new Map();
+        Object.keys(this.meta.subMetas).forEach((id) => {
+            const subMeta = this.meta.subMetas[id];
+            if (subMeta.importer === 'gltf-animation') {
+                const sourceName = subMeta.name;
+                const animName = sourceName.slice(0, sourceName.lastIndexOf('.'));
+                animationNameToUUIDMap.set(animName, subMeta.uuid);
+            }
+        });
+
+        this.animationNameToUUIDMap = animationNameToUUIDMap;
+    }
+
+    if (this.meta && this.meta.userData.animationImportSettings) {
+        this.animationInfos = this.meta.userData.animationImportSettings;
+        // Collect clip names for renaming and creating to determine whether the name is repeated
+        this.clipNames = new Set();
+        for (const animationInfo of this.animationInfos) {
+            this.clipNames.add(animationInfo.name);
+            for (const subAnimInfo of animationInfo.splits) {
+                this.clipNames.add(subAnimInfo.name);
+            }
+        }
+        this.onSelect(0, 0);
+    } else {
+        this.animationInfos = null;
+    }
 };
 
 exports.ready = function () {
@@ -615,6 +668,57 @@ exports.close = function () {
 };
 
 exports.methods = {
+    onSelect(rawClipIndex, splitClipIndex) {
+        this.rawClipIndex = rawClipIndex;
+        this.splitClipIndex = splitClipIndex;
+        const isElementSelect = (element) =>
+            element.getAttribute('rawClipIndex') == rawClipIndex && element.getAttribute('splitClipIndex') == splitClipIndex;
+        Elements.editor.update.call(this);
+
+        this.$.clips.querySelectorAll('.line').forEach((child) => {
+            if (isElementSelect(child)) {
+                child.setAttribute('active', true);
+            } else {
+                child.removeAttribute('active');
+            }
+        });
+        const curClipInfo = this.getCurClipInfo();
+        Editor.Message.broadcast('fbx-inspector:animation-change', curClipInfo);
+    },
+    getCurClipInfo() {
+        const animInfo = this.animationInfos[this.rawClipIndex];
+        const splitInfo = animInfo.splits[this.splitClipIndex];
+
+        if (!animInfo) {
+            return;
+        }
+
+        const clipUUID = this.animationNameToUUIDMap.get(animInfo.name);
+        let duration = animInfo.duration;
+        let fps = animInfo.fps;
+        let from = 0;
+        let to = duration;
+        if (splitInfo) {
+            from = splitInfo.from;
+            to = splitInfo.to;
+            duration = to - from;
+            if (splitInfo.fps !== undefined) {
+                fps = splitInfo.fps;
+            }
+
+            // if (this.animationNameToUUIDMap.has(splitInfo.name)) {
+            //     clipUUID = this.animationNameToUUIDMap.get(splitInfo.name);
+            // }
+        }
+
+        return {
+            clipUUID,
+            duration,
+            fps,
+            from,
+            to,
+        };
+    },
     getRightName(name) {
         if (!name) {
             return null;
@@ -623,16 +727,16 @@ exports.methods = {
         do {
             const result = name.match(/(.*)_(\d{0,3})/);
             if (result) {
-                name = result[1] + '_' + (Number(result[2]) + 1);
+                name = `${result[1]}_${Number(result[2]) + 1}`;
             } else {
-                name = name + '_1';
+                name += '_1';
             }
         } while (panel.clipNames.has(name));
         return name;
     },
     newClipTemplate() {
         const panel = this;
-        // 对名字做验证
+        // Verify the name
         return {
             name: panel.getRightName(panel.rawClipInfo.name),
             from: 0,
@@ -748,7 +852,7 @@ exports.methods = {
         let spacing = rawMinSpacing;
         let step = 1;
         if (rawMinSpacing < config.minSpacing) {
-            // 计算一个最小 spacing 的最小的大于 maxSpacing 倍数的值
+            // Calculates a minimum spacing value that is a multiple of maxSpacing
             step = Math.ceil(config.minSpacing / rawMinSpacing);
             spacing = rawMinSpacing * step;
         }
@@ -796,7 +900,7 @@ exports.methods = {
             return;
         }
 
-        // 超出边界
+        // beyond border
         const { type } = panel.virtualControl;
         let x = event.x - panel.$.rulerMaking.getBoundingClientRect().x;
         if (
@@ -814,7 +918,7 @@ exports.methods = {
         panel.virtualControl.value = currentTime;
         if (type === 'left') {
             panel.virtualControl.startFrame = currentFrame;
-            x = x - 6;
+            x -= 6;
         } else {
             panel.virtualControl.endFrame = currentFrame;
         }
@@ -841,7 +945,7 @@ exports.methods = {
         let { type } = panel.virtualControl;
         type = type === 'right' ? 'to' : 'from';
 
-        // 更新数据
+        // refresh data
         const splitInfo = panel.animationInfos[panel.rawClipIndex].splits[panel.splitClipIndex];
         if (splitInfo[type].toFixed(2) !== value.toFixed(2)) {
             const { duration } = panel.rawClipInfo;
@@ -855,6 +959,8 @@ exports.methods = {
         Object.assign(panel.$.controlRight.style, panel.currentClipInfo.ctrlEndStyle);
 
         panel.$.controlVirtual.style.display = 'none';
+        const curClipInfo = panel.getCurClipInfo();
+        Editor.Message.broadcast('fbx-inspector:animation-change', curClipInfo);
     },
     updateVirtualControl() {
         const panel = this;

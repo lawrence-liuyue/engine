@@ -46,13 +46,11 @@ const Elements = {
         ready() {
             const panel = this;
 
-            panel.$.canvas.addEventListener('mousedown', (event) => {
-                // event.target.requestPointerLock();
+            panel.$.canvas.addEventListener('mousedown', async (event) => {
+                await Editor.Message.request('scene', 'on-skeleton-preview-mouse-down', { x: event.x, y: event.y });
 
-                Editor.Message.request('scene', 'on-skeleton-preview-mouse-down', { x: event.x, y: event.y });
-
-                function mousemove(event) {
-                    Editor.Message.send('scene', 'on-skeleton-preview-mouse-move', {
+                async function mousemove(event) {
+                    await Editor.Message.request('scene', 'on-skeleton-preview-mouse-move', {
                         movementX: event.movementX,
                         movementY: event.movementY,
                     });
@@ -60,10 +58,8 @@ const Elements = {
                     panel.isPreviewDataDirty = true;
                 }
 
-                function mouseup(event) {
-                    // document.exitPointerLock();
-
-                    Editor.Message.send('scene', 'on-skeleton-preview-mouse-up', {
+                async function mouseup(event) {
+                    await Editor.Message.request('scene', 'on-skeleton-preview-mouse-up', {
                         x: event.x,
                         y: event.y,
                     });
@@ -95,13 +91,12 @@ const Elements = {
         async update() {
             const panel = this;
 
-            await panel.glPreview.init({ width: panel.$.canvas.clientWidth, height: panel.$.canvas.clientHeight });
-            await Editor.Message.request('scene', 'set-skeleton-preview-skeleton', panel.asset.uuid);
-
-            // await 等待后，面板已经不存在了
             if (!panel.$.canvas) {
                 return;
             }
+
+            await panel.glPreview.init({ width: panel.$.canvas.clientWidth, height: panel.$.canvas.clientHeight });
+            await Editor.Message.request('scene', 'set-skeleton-preview-skeleton', panel.asset.uuid);
 
             panel.refreshPreview();
         },
@@ -173,11 +168,14 @@ exports.methods = {
     async refreshPreview() {
         const panel = this;
 
+        // After await, the panel no longer exists
         if (!panel.$.canvas) {
             return;
         }
 
         if (panel.isPreviewDataDirty) {
+            panel.isPreviewDataDirty = false;
+
             try {
                 const canvas = panel.$.canvas;
                 const image = panel.$.image;
@@ -201,8 +199,6 @@ exports.methods = {
             } catch (e) {
                 console.warn(e);
             }
-
-            panel.isPreviewDataDirty = false;
         }
 
         cancelAnimationFrame(panel.animationId);
