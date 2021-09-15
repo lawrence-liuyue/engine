@@ -202,6 +202,7 @@ export const NativePass: Constructor<{
     setPipelineLayout(val): void;
     setRootBufferAndBlock(val: Buffer, block: ArrayBuffer): void;
     setRootBufferDirty(val: boolean): void;
+    setUseMipmap(): void;
 }> = null!;
 export type NativePass = InstanceType<typeof NativePass>;
 

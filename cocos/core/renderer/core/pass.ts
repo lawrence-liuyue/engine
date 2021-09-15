@@ -580,6 +580,12 @@ export class Pass {
         }
     }
 
+    public _setUseMipmap(): void {
+        if (JSB && this._defines.USE_MIPMAP) {
+            this._nativeObj?.setUseMipmap();
+        }
+    }
+
     private _setStage (val: RenderPassStage) {
         this._stage = val;
         if (JSB) {

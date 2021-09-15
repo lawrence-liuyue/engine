@@ -50,8 +50,6 @@ export class SubModel {
     protected _descriptorSet: DescriptorSet | null = null;
     protected _planarInstanceShader: Shader | null = null;
     protected _planarShader: Shader | null = null;
-    protected _reflectionTex: Texture | null = null;
-    protected _reflectionSampler: Sampler | null = null;
     protected declare _nativeObj: NativeSubModel | null;
 
     private _destroyDescriptorSet () {
@@ -186,38 +184,7 @@ export class SubModel {
 
         // initialize resources for reflection material
         if (passes[0].phase === getPhaseID('reflection')) {
-            let texWidth = root.mainWindow!.width;
-            let texHeight = root.mainWindow!.height;
-            const minSize = 512;
-
-            if (texHeight < texWidth) {
-                texWidth = minSize * texWidth / texHeight;
-                texHeight = minSize;
-            } else {
-                texWidth = minSize;
-                texHeight = minSize * texHeight / texWidth;
-            }
-
-            this._reflectionTex = this._device.createTexture(new TextureInfo(
-                TextureType.TEX2D,
-                TextureUsageBit.STORAGE | TextureUsageBit.TRANSFER_SRC | TextureUsageBit.SAMPLED,
-                Format.RGBA8,
-                texWidth,
-                texHeight,
-            ));
-
-            this.descriptorSet.bindTexture(UNIFORM_REFLECTION_TEXTURE_BINDING, this._reflectionTex);
-
-            this._reflectionSampler = this._device.getSampler(new SamplerInfo(
-                Filter.LINEAR,
-                Filter.LINEAR,
-                Filter.NONE,
-                Address.CLAMP,
-                Address.CLAMP,
-                Address.CLAMP,
-            ));
-            this.descriptorSet.bindSampler(UNIFORM_REFLECTION_TEXTURE_BINDING, this._reflectionSampler);
-            this.descriptorSet.bindTexture(UNIFORM_REFLECTION_STORAGE_BINDING, this._reflectionTex);
+            passes[0]._setUseMipmap();
         }
     }
 
@@ -267,10 +234,6 @@ export class SubModel {
 
         this._passes = null;
         this._shaders = null;
-
-        if (this._reflectionTex) this._reflectionTex.destroy();
-        this._reflectionTex = null;
-        this._reflectionSampler = null;
 
         this._destroy();
     }

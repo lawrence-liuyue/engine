@@ -226,9 +226,9 @@ CCProgram standard-fs %{
   #pragma builtin(local)
   layout(set = 2, binding = 11) uniform sampler2D cc_reflectionTexture;
 
-  layout(location = 0) out vec4 fragColorX;                        
+  layout(location = 0) out vec4 fragColorX;
 
-  void main () {                                                   
+  void main () {
     StandardSurface s; surf(s);
     vec4 color = CCStandardShadingBase(s, CC_SHADOW_POSITION);
     CC_APPLY_FOG(color);
@@ -242,7 +242,16 @@ CCProgram standard-fs %{
     vec2 resolution = cc_screenSize.xy;
     vec2 uv = (gl_FragCoord.xy / resolution) + noise;
     vec4 reflectionColor = texture(cc_reflectionTexture, uv);
+
+    #if USE_MIPMAP
+    if (reflectionColor.a != 0.0) {
+      fragColorX = mix(baseColor, reflectionColor, 0.5);
+    } else {
+      fragColorX = mix(baseColor, reflectionColor, 0.15);
+    }
+    #else
     fragColorX = mix(baseColor, reflectionColor, 0.5);
+    #endif
     fragColorX.w = 1.0;
   }
 }%
